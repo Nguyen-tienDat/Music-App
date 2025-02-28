@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "637208274302",
+    "project_id": "musicapp-b5eb4",
+    "storage_bucket": "musicapp-b5eb4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:637208274302:android:3e97b89a15c956a7d7ff2f",
+        "android_client_info": {
+          "package_name": "com.example.zing_mp3"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt-FQRLxSFf8j0DXx9ENPMRgan-DgOfXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
