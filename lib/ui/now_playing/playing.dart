@@ -172,6 +172,14 @@ class _NowPlayingPageState extends State<NowPlayingPage>
         )));
   }
 
+  @override
+  //huy bo bai hat hien dang phat neu chon 1 bai hat khac
+  void dispose(){
+    _audioPlayerManager.dispose();
+    super.dispose();
+
+  }
+
   Widget _mediaButtons() {
     return SizedBox(
       child: Row(
@@ -215,6 +223,17 @@ class _NowPlayingPageState extends State<NowPlayingPage>
           return ProgressBar(
             progress: progress,
             total: total,
+            // lay bo dem
+            buffered: buffered,
+            //seekbar
+            onSeek: _audioPlayerManager.player.seek,
+            baseBarColor: Colors.black12,
+            barHeight: 5.0,
+            barCapShape: BarCapShape.round,
+            progressBarColor: Colors.black,
+            bufferedBarColor: Colors.grey.withOpacity(0.3),
+            thumbColor: Colors.deepPurple,
+            thumbGlowColor: Colors.grey.withOpacity(0.3),
           );
         });
   }

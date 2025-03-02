@@ -30,4 +30,8 @@ class AudioPlayerManager {
             total: playbackEvent.duration));
     player.setUrl(songUrl);
   }
+  // sua loi phat chong lan bai hat
+  void dispose(){
+    player.dispose();
+  }
 }
