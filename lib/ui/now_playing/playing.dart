@@ -44,6 +44,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   late Song _song;
   double _currentAnimationPosition = 0.0;
   bool _isShuffle = false;
+  late LoopMode _loopMode;
 
   @override
   void initState() {
@@ -53,13 +54,19 @@ class _NowPlayingPageState extends State<NowPlayingPage>
     _song = widget.playingSong;
     _imageAnimAController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 12000),
     );
 
-    _audioPlayerManager =
-        AudioPlayerManager(songUrl: widget.playingSong.source);
-    _audioPlayerManager.init();
+    _audioPlayerManager = AudioPlayerManager();
+    if(_audioPlayerManager.songUrl.compareTo(_song.source) != 0){
+      _audioPlayerManager.updateSongUrl(_song.source);
+      _audioPlayerManager.prepare(isNewSong: true);
+    }else{
+      _audioPlayerManager.prepare(isNewSong: false);
+    }
+
     _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
+    _loopMode = LoopMode.off;
   }
 
   @override
@@ -96,7 +103,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
               //tao ra dia xoay nhac
               RotationTransition(
                 turns:
-                    Tween(begin: 0.0, end: 0.5).animate(_imageAnimAController),
+                    Tween(begin: 0.0, end: 1.0).animate(_imageAnimAController),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(radius),
                   child: FadeInImage.assetNetwork(
@@ -183,7 +190,6 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   @override
   //huy bo bai hat hien dang phat neu chon 1 bai hat khac
   void dispose() {
-    _audioPlayerManager.dispose();
     _imageAnimAController.dispose();
     super.dispose();
   }
@@ -210,9 +216,9 @@ class _NowPlayingPageState extends State<NowPlayingPage>
               icon: Icons.skip_next,
               size: 36),
           MediaButtonControl(
-              function: null,
-              color: Colors.deepPurple,
-              icon: Icons.repeat,
+              function: _setupRepeatOption,
+              color: _getRepeatColor(),
+              icon: _repeatingIcon(),
               size: 24),
         ],
       ),
@@ -317,42 +323,79 @@ class _NowPlayingPageState extends State<NowPlayingPage>
     return _isShuffle ? Colors.deepPurple : Colors.grey;
   }
 
+//next-previous song
   void _setNextSong() {
+    int newIndex;
+
     if (_isShuffle) {
       var random = Random();
-      _selectedItemIndex = random.nextInt(widget.songs.length);
+      newIndex = random.nextInt(widget.songs.length);
+    } else if (_selectedItemIndex < widget.songs.length - 1) {
+      newIndex = _selectedItemIndex + 1;
+    } else if (_loopMode == LoopMode.all) {
+      newIndex = 0; // move to the final song if in loop mode ALL
     } else {
-      ++_selectedItemIndex;
+      return; // do nothing in the first song on loop mode
     }
-    if (_selectedItemIndex > widget.songs.length) {
-      _selectedItemIndex = _selectedItemIndex % widget.songs.length;
+
+    _selectedItemIndex = newIndex;
+    _changeSong(widget.songs[_selectedItemIndex]);
+  }
+
+  void _setPrevSong() {
+    int newIndex;
+
+    if (_isShuffle) {
+      var random = Random();
+      newIndex = random.nextInt(widget.songs.length);
+    } else if (_selectedItemIndex > 0) {
+      newIndex = _selectedItemIndex - 1;
+    } else if (_loopMode == LoopMode.all) {
+      newIndex = widget.songs.length - 1; // move to the final song if in loop mode ALL
+    } else {
+      return; // do nothing in the first song on loop mode
     }
-    final nextSong = widget.songs[_selectedItemIndex];
-    _audioPlayerManager.updateSongUrl(nextSong.source);
-    //reset animation
+
+    _selectedItemIndex = newIndex;
+    _changeSong(widget.songs[_selectedItemIndex]);
+  }
+
+
+  void _changeSong(Song newSong) {
+    _audioPlayerManager.updateSongUrl(newSong.source);
+    _audioPlayerManager.prepare(isNewSong: true);
+
+    // reset animation
     _resetRotationAnim();
+
     setState(() {
-      _song = nextSong;
+      _song = newSong;
     });
   }
 
-//next-previous song
-  void _setPrevSong() {
-    if (_isShuffle) {
-      var random = Random();
-      _selectedItemIndex = random.nextInt(widget.songs.length);
+  //repeat song
+  IconData _repeatingIcon() {
+    return switch (_loopMode) {
+      LoopMode.one => Icons.repeat_one,
+      LoopMode.all => Icons.repeat_on,
+      _ => Icons.repeat,
+    };
+  }
+
+  Color? _getRepeatColor() {
+    return _loopMode == LoopMode.off ? Colors.grey : Colors.deepPurple;
+  }
+
+  void _setupRepeatOption() {
+    if (_loopMode == LoopMode.off) {
+      _loopMode = LoopMode.one;
+    } else if (_loopMode == LoopMode.one) {
+      _loopMode = LoopMode.all;
     } else {
-      --_selectedItemIndex;
+      _loopMode = LoopMode.off;
     }
-    if (_selectedItemIndex < 0) {
-      _selectedItemIndex = (-1 * _selectedItemIndex) % widget.songs.length;
-    }
-    final nextSong = widget.songs[_selectedItemIndex];
-    _audioPlayerManager.updateSongUrl(nextSong.source);
-    //reset animation
-    _resetRotationAnim();
     setState(() {
-      _song = nextSong;
+      _audioPlayerManager.player.setLoopMode(_loopMode);
     });
   }
 
