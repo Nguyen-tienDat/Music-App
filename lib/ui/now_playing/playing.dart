@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/cupertino.dart';
@@ -39,19 +40,26 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   //animation controller
   late AnimationController _imageAnimAController;
   late AudioPlayerManager _audioPlayerManager;
+  late int _selectedItemIndex;
+  late Song _song;
+  double _currentAnimationPosition = 0.0;
+  bool _isShuffle = false;
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
+    _currentAnimationPosition = 0.0;
+    _song = widget.playingSong;
     _imageAnimAController = AnimationController(
       vsync: this,
-      duration: const Duration(microseconds: 12000),
+      duration: const Duration(milliseconds: 1200),
     );
 
     _audioPlayerManager =
         AudioPlayerManager(songUrl: widget.playingSong.source);
     _audioPlayerManager.init();
+    _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
   }
 
   @override
@@ -76,7 +84,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
             //can vao giua
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(widget.playingSong.album),
+              Text(_song.album),
               const SizedBox(
                 height: 16,
               ),
@@ -88,12 +96,12 @@ class _NowPlayingPageState extends State<NowPlayingPage>
               //tao ra dia xoay nhac
               RotationTransition(
                 turns:
-                    Tween(begin: 0.0, end: 1.0).animate(_imageAnimAController),
+                    Tween(begin: 0.0, end: 0.5).animate(_imageAnimAController),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(radius),
                   child: FadeInImage.assetNetwork(
                     placeholder: 'assets/itunes.jpg',
-                    image: widget.playingSong.image,
+                    image: _song.image,
                     width: screenWith - delta,
                     height: screenWith - delta,
                     imageErrorBuilder: (context, error, stackTrace) {
@@ -120,7 +128,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                       Column(
                         children: [
                           Text(
-                            widget.playingSong.title,
+                            _song.title,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium!
@@ -134,7 +142,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                             height: 8,
                           ),
                           Text(
-                            widget.playingSong.artist,
+                            _song.artist,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium!
@@ -174,10 +182,10 @@ class _NowPlayingPageState extends State<NowPlayingPage>
 
   @override
   //huy bo bai hat hien dang phat neu chon 1 bai hat khac
-  void dispose(){
+  void dispose() {
     _audioPlayerManager.dispose();
+    _imageAnimAController.dispose();
     super.dispose();
-
   }
 
   Widget _mediaButtons() {
@@ -186,19 +194,18 @@ class _NowPlayingPageState extends State<NowPlayingPage>
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           MediaButtonControl(
-              function: null,
-              color: Colors.deepPurple,
+              function: _setShuffle,
+              color: _getShuffleColor(),
               icon: Icons.shuffle,
               size: 24),
           MediaButtonControl(
-              function: null,
+              function: _setPrevSong,
               color: Colors.deepPurple,
               icon: Icons.skip_previous,
               size: 36),
           _playButton(),
-
           MediaButtonControl(
-              function: null,
+              function: _setNextSong,
               color: Colors.deepPurple,
               icon: Icons.skip_next,
               size: 36),
@@ -248,6 +255,9 @@ class _NowPlayingPageState extends State<NowPlayingPage>
 
           if (processingState == ProcessingState.loading ||
               processingState == ProcessingState.buffering) {
+            //pause animation
+            //khi bai hat dang load => pause rotation
+            _pauseRorationAnim();
             return Container(
               margin: const EdgeInsets.all(8),
               width: 48,
@@ -257,29 +267,113 @@ class _NowPlayingPageState extends State<NowPlayingPage>
           } else if (playing != true) {
             return MediaButtonControl(
                 function: () {
+                  // start or resume animation
                   _audioPlayerManager.player.play();
                 },
                 color: null,
                 icon: Icons.play_arrow,
                 size: 48);
           } else if (processingState != ProcessingState.completed) {
+            //play animation
+            _playRotationAnim();
             return MediaButtonControl(
                 function: () {
+                  // stop animation, save current position value for resume
                   _audioPlayerManager.player.pause();
+                  _pauseRorationAnim();
                 },
                 color: null,
                 icon: Icons.pause,
                 size: 48);
           } else {
+            // if song completed -> stop and reset animation
+            if (processingState == ProcessingState.completed) {
+              _stopRotationAnim();
+              _resetRotationAnim();
+            }
+
             return MediaButtonControl(
                 function: () {
+                  //reset and restart animation
                   _audioPlayerManager.player.seek(Duration.zero);
+                  _resetRotationAnim();
+                  _playRotationAnim();
                 },
                 color: null,
                 icon: Icons.replay,
                 size: 48);
           }
         });
+  }
+
+  //shuffle song
+  void _setShuffle() {
+    setState(() {
+      _isShuffle = !_isShuffle;
+    });
+  }
+
+  Color? _getShuffleColor() {
+    return _isShuffle ? Colors.deepPurple : Colors.grey;
+  }
+
+  void _setNextSong() {
+    if (_isShuffle) {
+      var random = Random();
+      _selectedItemIndex = random.nextInt(widget.songs.length);
+    } else {
+      ++_selectedItemIndex;
+    }
+    if (_selectedItemIndex > widget.songs.length) {
+      _selectedItemIndex = _selectedItemIndex % widget.songs.length;
+    }
+    final nextSong = widget.songs[_selectedItemIndex];
+    _audioPlayerManager.updateSongUrl(nextSong.source);
+    //reset animation
+    _resetRotationAnim();
+    setState(() {
+      _song = nextSong;
+    });
+  }
+
+//next-previous song
+  void _setPrevSong() {
+    if (_isShuffle) {
+      var random = Random();
+      _selectedItemIndex = random.nextInt(widget.songs.length);
+    } else {
+      --_selectedItemIndex;
+    }
+    if (_selectedItemIndex < 0) {
+      _selectedItemIndex = (-1 * _selectedItemIndex) % widget.songs.length;
+    }
+    final nextSong = widget.songs[_selectedItemIndex];
+    _audioPlayerManager.updateSongUrl(nextSong.source);
+    //reset animation
+    _resetRotationAnim();
+    setState(() {
+      _song = nextSong;
+    });
+  }
+
+  //animation
+  void _playRotationAnim() {
+    _imageAnimAController.forward(from: _currentAnimationPosition);
+    _imageAnimAController.repeat();
+  }
+
+  void _pauseRorationAnim() {
+    _stopRotationAnim();
+    _currentAnimationPosition = _imageAnimAController.value;
+  }
+
+  void _stopRotationAnim() {
+    _imageAnimAController.stop();
+  }
+
+  void _resetRotationAnim() {
+    _currentAnimationPosition = 0.0;
+    _imageAnimAController.value = _currentAnimationPosition;
   }
 }
 
